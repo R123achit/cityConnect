@@ -1,0 +1,10 @@
+/* Styles for the Login page. Add your custom styles here. */
+
+.login-container {
+  /* Example style */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #f5eeee;
+}
