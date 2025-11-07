@@ -143,11 +143,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'CitiConnect Server is running' });
 });
 
-const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+app.get('/', (req, res) => {
+  res.json({ status: 'OK', message: 'CitiConnect Backend API' });
 });
 
-module.exports = { io };
+const PORT = process.env.PORT || 5000;
+
+// Only start server if not in Vercel serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
