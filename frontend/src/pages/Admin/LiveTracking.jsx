@@ -63,32 +63,59 @@ const LiveTracking = () => {
   const connectSocket = () => {
     const socket = socketService.connect();
 
+    socket.on('connect', () => {
+      console.log('✅ Admin connected to socket');
+      // Request all active buses on connect
+      socket.emit('get:active-buses');
+    });
+
+    // Listen for real-time bus location updates
     socket.on('bus:location-updated', (data) => {
+      console.log('📍 Admin received bus location update:', data);
+      
       setActiveBuses(prev => {
         const index = prev.findIndex(b => b.busId === data.busId);
         if (index !== -1) {
+          // Update existing bus
           const updated = [...prev];
-          updated[index] = data;
+          updated[index] = {
+            ...updated[index],
+            location: data.location,
+            currentStop: data.currentStop,
+            nextStop: data.nextStop,
+            status: data.status,
+            lastUpdate: data.timestamp
+          };
           return updated;
+        } else {
+          // Add new bus if not in list
+          return [...prev, data];
         }
-        return [...prev, data];
       });
     });
 
     socket.on('bus:trip-started', (data) => {
-      console.log('Bus trip started:', data);
+      console.log('🚀 Bus trip started:', data);
       fetchActiveBuses();
     });
 
     socket.on('bus:trip-stopped', (data) => {
+      console.log('🛑 Bus trip stopped:', data);
       setActiveBuses(prev => prev.filter(b => b.busId !== data.busId));
     });
 
     socket.on('bus:disconnected', (data) => {
+      console.log('🔌 Bus disconnected:', data);
       setActiveBuses(prev => prev.filter(b => b.busId !== data.busId));
     });
 
-    socket.emit('get:active-buses');
+    // Receive list of active buses
+    socket.on('active-buses', (buses) => {
+      console.log('📋 Received active buses:', buses);
+      if (buses && buses.length > 0) {
+        setActiveBuses(buses);
+      }
+    });
   };
 
   const filteredBuses = selectedRoute

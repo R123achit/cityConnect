@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -67,6 +68,7 @@ export default {
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'glow': '0 0 20px rgba(14, 165, 233, 0.3)',
         'glow-lg': '0 0 30px rgba(14, 165, 233, 0.4)',
+        'dark-glow': '0 0 25px rgba(139, 92, 246, 0.5)',
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',

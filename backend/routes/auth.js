@@ -91,18 +91,29 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Populate driver-specific data if role is driver
+    let userData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      licenseNumber: user.licenseNumber,
+      token: generateToken(user._id)
+    };
+
+    if (user.role === 'driver') {
+      const populatedUser = await User.findById(user._id)
+        .populate('assignedBus')
+        .populate('assignedRoute');
+      
+      userData.assignedBus = populatedUser.assignedBus;
+      userData.assignedRoute = populatedUser.assignedRoute;
+    }
+
     res.json({
       success: true,
-      data: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        assignedBus: user.assignedBus,
-        assignedRoute: user.assignedRoute,
-        token: generateToken(user._id)
-      }
+      data: userData
     });
   } catch (error) {
     res.status(500).json({

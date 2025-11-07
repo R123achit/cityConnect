@@ -166,9 +166,21 @@ router.post('/drivers', async (req, res) => {
 
     const driver = await User.create(driverData);
 
+    // If bus is assigned, update the bus with this driver
+    if (req.body.assignedBus) {
+      await Bus.findByIdAndUpdate(req.body.assignedBus, {
+        assignedDriver: driver._id,
+        assignedRoute: req.body.assignedRoute || null
+      });
+    }
+
+    const populatedDriver = await User.findById(driver._id)
+      .populate('assignedBus')
+      .populate('assignedRoute');
+
     res.status(201).json({
       success: true,
-      data: driver
+      data: populatedDriver
     });
   } catch (error) {
     res.status(500).json({
@@ -182,6 +194,26 @@ router.post('/drivers', async (req, res) => {
 // @desc    Update a driver
 router.put('/drivers/:id', async (req, res) => {
   try {
+    const oldDriver = await User.findById(req.params.id);
+    
+    // If bus assignment is changing, update both old and new buses
+    if (req.body.assignedBus !== undefined) {
+      // Remove driver from old bus if exists
+      if (oldDriver.assignedBus && oldDriver.assignedBus.toString() !== req.body.assignedBus) {
+        await Bus.findByIdAndUpdate(oldDriver.assignedBus, {
+          $unset: { assignedDriver: 1 }
+        });
+      }
+      
+      // Assign driver to new bus
+      if (req.body.assignedBus) {
+        await Bus.findByIdAndUpdate(req.body.assignedBus, {
+          assignedDriver: req.params.id,
+          assignedRoute: req.body.assignedRoute || null
+        });
+      }
+    }
+
     const driver = await User.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true

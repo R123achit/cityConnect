@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Phone, UserPlus, Shield, LogIn } from 'lucide-react';
+import { Mail, Lock, User, Phone, UserPlus, Shield, LogIn, Moon, Sun } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
+import { useTheme } from '../../context/ThemeContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
   const { register } = useAuthStore();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -45,12 +47,24 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary-600 via-primary-700 to-primary-600 px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary-600 via-primary-700 to-primary-600 dark:from-dark-950 dark:via-purple-950 dark:to-dark-900 px-4 py-12 relative overflow-hidden transition-colors duration-500">
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 z-50 p-3 bg-white/10 dark:bg-dark-800/50 hover:bg-white/20 dark:hover:bg-dark-700/70 backdrop-blur-md rounded-xl transition-all duration-300 shadow-lg border border-white/20 dark:border-purple-500/30"
+      >
+        {isDark ? (
+          <Sun size={24} className="text-yellow-400" />
+        ) : (
+          <Moon size={24} className="text-white" />
+        )}
+      </button>
+
       {/* Animated background elements - LARGER */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 -right-40 w-[500px] h-[500px] bg-secondary-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow"></div>
-        <div className="absolute -bottom-20 -left-40 w-[500px] h-[500px] bg-primary-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow" style={{animationDelay: '3s'}}></div>
-        <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-accent-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse-slow" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-20 -right-40 w-[500px] h-[500px] bg-secondary-400 dark:bg-purple-600 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow"></div>
+        <div className="absolute -bottom-20 -left-40 w-[500px] h-[500px] bg-primary-400 dark:bg-pink-600 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow" style={{animationDelay: '3s'}}></div>
+        <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-accent-400 dark:bg-blue-600 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse-slow" style={{animationDelay: '1s'}}></div>
         
         {/* Multiple People Waiting for Bus - ALL MUCH LARGER */}
         {/* Person 1 - Waving */}
@@ -286,28 +300,28 @@ const Register = () => {
             </svg>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-white mb-2 tracking-tight">CitiConnect</h1>
-          <p className="text-primary-100 text-base md:text-lg font-medium">Join the journey today</p>
+          <p className="text-primary-100 dark:text-purple-300 text-base md:text-lg font-medium">Join the journey today</p>
         </div>
 
         {/* Register Card */}
-        <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/20 animate-slide-up">
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-gray-900 mb-2 text-center">
+        <div className="bg-white/95 dark:bg-dark-900/95 backdrop-blur-lg rounded-3xl shadow-2xl dark:shadow-dark-glow p-6 sm:p-8 border border-white/20 dark:border-purple-500/30 animate-slide-up">
+          <h2 className="text-2xl sm:text-3xl font-display font-bold text-gray-900 dark:text-white mb-2 text-center">
             Create Account
           </h2>
-          <p className="text-gray-500 text-center mb-6">Get started in seconds</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center mb-6">Get started in seconds</p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name */}
             <div>
-              <label className="label">Full Name</label>
+              <label className="label dark:text-gray-300">Full Name</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   placeholder="Enter your name"
                   required
                 />
@@ -316,15 +330,15 @@ const Register = () => {
 
             {/* Email */}
             <div>
-              <label className="label">Email</label>
+              <label className="label dark:text-gray-300">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   placeholder="Enter your email"
                   required
                 />
@@ -333,15 +347,15 @@ const Register = () => {
 
             {/* Phone */}
             <div>
-              <label className="label">Phone Number</label>
+              <label className="label dark:text-gray-300">Phone Number</label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   placeholder="Enter your phone number"
                 />
               </div>
@@ -349,14 +363,14 @@ const Register = () => {
 
             {/* Role Selection */}
             <div>
-              <label className="label">Register As</label>
+              <label className="label dark:text-gray-300">Register As</label>
               <div className="relative">
-                <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <select
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
-                  className="input pl-12 appearance-none cursor-pointer"
+                  className="input pl-12 appearance-none cursor-pointer dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   required
                 >
                   <option value="user">User (Passenger)</option>
@@ -369,7 +383,7 @@ const Register = () => {
                   </svg>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {formData.role === 'user' && '🚌 Track buses and view routes'}
                 {formData.role === 'driver' && '🚗 Share location and manage trips'}
                 {formData.role === 'admin' && '⚙️ Manage buses, routes, and drivers'}
@@ -378,15 +392,15 @@ const Register = () => {
 
             {/* Password */}
             <div>
-              <label className="label">Password</label>
+              <label className="label dark:text-gray-300">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   placeholder="Create a password"
                   required
                   minLength={6}
@@ -396,15 +410,15 @@ const Register = () => {
 
             {/* Confirm Password */}
             <div>
-              <label className="label">Confirm Password</label>
+              <label className="label dark:text-gray-300">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="password"
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-800 dark:border-dark-600 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
                   placeholder="Confirm your password"
                   required
                   minLength={6}
@@ -416,7 +430,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn btn-primary flex items-center justify-center gap-2 py-3.5 text-lg font-semibold mt-6"
+              className="w-full btn btn-primary dark:bg-gradient-to-r dark:from-purple-600 dark:to-purple-700 dark:hover:from-purple-500 dark:hover:to-purple-600 flex items-center justify-center gap-2 py-3.5 text-lg font-semibold mt-6"
             >
               {loading ? (
                 <>
@@ -438,17 +452,17 @@ const Register = () => {
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <div className="w-full border-t border-gray-200 dark:border-dark-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500 font-medium">Already registered?</span>
+              <span className="px-4 bg-white dark:bg-dark-900 text-gray-500 dark:text-gray-400 font-medium">Already registered?</span>
             </div>
           </div>
 
           {/* Login Link */}
           <Link 
             to="/login" 
-            className="w-full btn btn-outline flex items-center justify-center gap-2 py-3"
+            className="w-full btn btn-outline dark:border-purple-500 dark:text-purple-400 dark:hover:bg-purple-500/10 flex items-center justify-center gap-2 py-3"
           >
             <LogIn size={20} />
             <span>Sign In Instead</span>

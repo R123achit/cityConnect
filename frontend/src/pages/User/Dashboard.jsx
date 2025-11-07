@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
-import { MapPin, Navigation, Clock, Bus as BusIcon } from 'lucide-react';
+import { MapPin, Navigation, Clock, Bus as BusIcon, Radio } from 'lucide-react';
 import socketService from '../../utils/socket';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -23,6 +23,8 @@ const Dashboard = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [center, setCenter] = useState([28.6139, 77.2090]);
   const [notifications, setNotifications] = useState([]);
+  const [liveUpdates, setLiveUpdates] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     fetchRoutes();
@@ -98,7 +100,21 @@ const Dashboard = () => {
   const connectSocket = () => {
     const socket = socketService.connect();
 
+    socket.on('connect', () => {
+      console.log('✅ User connected to socket');
+      setIsConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ User disconnected from socket');
+      setIsConnected(false);
+    });
+
+    // Listen for real-time bus location updates
     socket.on('bus:location-updated', (data) => {
+      console.log('📍 Bus location updated:', data);
+      setLiveUpdates(prev => prev + 1); // Increment counter for visual feedback
+      
       setActiveBuses(prev => {
         const index = prev.findIndex(b => b._id === data.busId);
         if (index !== -1) {
@@ -108,11 +124,41 @@ const Dashboard = () => {
             currentLocation: data.location,
             currentStop: data.currentStop,
             nextStop: data.nextStop,
+            status: data.status,
+            lastUpdate: data.timestamp
           };
           return updated;
         }
         return prev;
       });
+
+      // Update selected bus if it's the one being updated
+      if (selectedBus && selectedBus._id === data.busId) {
+        setSelectedBus(prev => ({
+          ...prev,
+          currentLocation: data.location,
+          currentStop: data.currentStop,
+          nextStop: data.nextStop
+        }));
+        
+        // Update map center to follow the bus
+        if (data.location && data.location.coordinates) {
+          setCenter([data.location.coordinates[1], data.location.coordinates[0]]);
+        }
+      }
+    });
+
+    // Listen for trip start events
+    socket.on('bus:trip-started', (data) => {
+      console.log('🚀 Bus trip started:', data);
+      toast.success('A bus has started its trip!', { icon: '🚌' });
+      fetchActiveBuses();
+    });
+
+    // Listen for trip stop events
+    socket.on('bus:trip-stopped', (data) => {
+      console.log('🛑 Bus trip stopped:', data);
+      setActiveBuses(prev => prev.filter(b => b._id !== data.busId));
     });
 
     socket.on('notification:broadcast', (data) => {
@@ -159,19 +205,40 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-4 md:space-y-6 p-4 md:p-0">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Live Bus Tracking</h1>
-        <p className="text-sm md:text-base text-gray-600 mt-1">Track buses in real-time</p>
+      {/* Header with Live Indicator */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Live Bus Tracking</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">Track buses in real-time</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="relative">
+            <Radio className={`text-green-600 dark:text-green-400 ${isConnected ? 'animate-pulse' : ''}`} size={20} />
+            {isConnected && (
+              <span className="absolute top-0 right-0 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-green-900 dark:text-green-300">
+              {isConnected ? 'LIVE' : 'Connecting...'}
+            </p>
+            <p className="text-xs text-green-700 dark:text-green-400">
+              {liveUpdates} updates
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Route Selection */}
-      <div className="card">
-        <label className="label text-sm md:text-base">Select Route</label>
+      <div className="card dark:bg-dark-800 dark:border-dark-700">
+        <label className="label text-sm md:text-base dark:text-gray-300">Select Route</label>
         <select
           value={selectedRoute}
           onChange={(e) => setSelectedRoute(e.target.value)}
-          className="input text-sm md:text-base"
+          className="input text-sm md:text-base dark:bg-dark-900 dark:border-dark-600 dark:text-white"
         >
           <option value="">All Routes</option>
           {routes.map((route) => (
@@ -183,7 +250,7 @@ const Dashboard = () => {
       </div>
 
       {/* Map */}
-      <div className="card p-0 overflow-hidden" style={{ height: '400px', minHeight: '300px' }}>
+      <div className="card dark:bg-dark-800 dark:border-dark-700 p-0 overflow-hidden" style={{ height: '400px', minHeight: '300px' }}>
         <MapContainer
           center={center}
           zoom={13}
@@ -278,43 +345,45 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Active Buses */}
-        <div className="lg:col-span-2 card">
-          <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Available Buses</h3>
+        <div className="lg:col-span-2 card dark:bg-dark-800 dark:border-dark-700">
+          <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 dark:text-white">Available Buses</h3>
           <div className="space-y-3 max-h-80 md:max-h-96 overflow-y-auto">
             {activeBuses.map((bus) => (
               <div
                 key={bus._id}
                 className={`p-3 md:p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer ${
-                  selectedBus?._id === bus._id ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                  selectedBus?._id === bus._id 
+                    ? 'border-primary-500 bg-primary-50 dark:border-purple-500 dark:bg-purple-900/20' 
+                    : 'border-gray-200 dark:border-dark-600 dark:bg-dark-700/50'
                 }`}
                 onClick={() => handleTrackBus(bus)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 md:gap-3">
-                    <BusIcon className="text-primary-600" size={20} />
+                    <BusIcon className="text-primary-600 dark:text-purple-400" size={20} />
                     <div>
-                      <h4 className="font-bold text-sm md:text-base">{bus.busNumber}</h4>
-                      <p className="text-xs md:text-sm text-gray-600">
+                      <h4 className="font-bold text-sm md:text-base dark:text-white">{bus.busNumber}</h4>
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
                         {bus.assignedRoute?.routeNumber} - {bus.assignedRoute?.routeName}
                       </p>
                     </div>
                   </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs font-medium rounded-full">
                     Online
                   </span>
                 </div>
                 <div className="mt-2 md:mt-3 grid grid-cols-2 gap-2 text-xs md:text-sm">
                   <div>
-                    <p className="text-gray-600">Current Stop</p>
-                    <p className="font-medium truncate">{bus.currentStop || 'N/A'}</p>
+                    <p className="text-gray-600 dark:text-gray-400">Current Stop</p>
+                    <p className="font-medium truncate dark:text-white">{bus.currentStop || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Next Stop</p>
-                    <p className="font-medium truncate">{bus.nextStop || 'N/A'}</p>
+                    <p className="text-gray-600 dark:text-gray-400">Next Stop</p>
+                    <p className="font-medium truncate dark:text-white">{bus.nextStop || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-600">ETA to You</p>
-                    <p className="font-medium flex items-center gap-1">
+                    <p className="text-gray-600 dark:text-gray-400">ETA to You</p>
+                    <p className="font-medium flex items-center gap-1 dark:text-white">
                       <Clock size={14} />
                       {calculateETA(bus)}
                     </p>
@@ -323,26 +392,26 @@ const Dashboard = () => {
               </div>
             ))}
             {activeBuses.length === 0 && (
-              <p className="text-center text-gray-500 text-sm md:text-base py-8">No buses available on this route</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 text-sm md:text-base py-8">No buses available on this route</p>
             )}
           </div>
         </div>
 
         {/* Notifications */}
-        <div className="card">
-          <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Recent Notifications</h3>
+        <div className="card dark:bg-dark-800 dark:border-dark-700">
+          <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 dark:text-white">Recent Notifications</h3>
           <div className="space-y-2 md:space-y-3 max-h-80 md:max-h-96 overflow-y-auto">
             {notifications.map((notification) => (
-              <div key={notification._id} className="p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-xs md:text-sm mb-1">{notification.title}</h4>
-                <p className="text-xs text-gray-600">{notification.message}</p>
-                <p className="text-xs text-gray-400 mt-1">
+              <div key={notification._id} className="p-3 bg-gray-50 dark:bg-dark-700/50 rounded-lg border border-gray-100 dark:border-dark-600">
+                <h4 className="font-medium text-xs md:text-sm mb-1 dark:text-white">{notification.title}</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{notification.message}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   {new Date(notification.createdAt).toLocaleString()}
                 </p>
               </div>
             ))}
             {notifications.length === 0 && (
-              <p className="text-center text-gray-500 py-4 text-xs md:text-sm">No new notifications</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-xs md:text-sm">No new notifications</p>
             )}
           </div>
         </div>

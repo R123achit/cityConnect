@@ -68,10 +68,20 @@ const Dashboard = () => {
 
     socket.on('connect', () => {
       setIsOnline(true);
+      console.log('✅ Driver connected to socket');
+      
+      // Notify backend that driver is online
+      if (assignedBus) {
+        socket.emit('driver:online', {
+          driverId: JSON.parse(localStorage.getItem('user'))?._id,
+          busId: assignedBus._id
+        });
+      }
     });
 
     socket.on('disconnect', () => {
       setIsOnline(false);
+      console.log('❌ Driver disconnected from socket');
     });
 
     socket.on('notification:broadcast', (data) => {
@@ -96,43 +106,85 @@ const Dashboard = () => {
 
   const startTrip = async () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported');
+      toast.error('Geolocation is not supported by your browser');
       return;
     }
 
     try {
-      await api.put('/driver/start-trip');
-      setTripActive(true);
-      setTripStartTime(new Date());
-      toast.success('Trip started');
-
-      socketService.emit('driver:start-trip', {
-        busId: assignedBus._id,
-        timestamp: new Date()
-      });
-
-      // Start location tracking
-      const watcherId = navigator.geolocation.watchPosition(
-        (position) => {
-          const location = {
+      // First get initial position to verify GPS works
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          // Initial position obtained successfully
+          const initialLocation = {
             coordinates: [position.coords.longitude, position.coords.latitude]
           };
           
-          setCurrentLocation(location);
-          updateLocation(location);
+          setCurrentLocation(initialLocation);
+          toast.success('GPS location obtained! Starting trip...');
+
+          // Now start the trip
+          await api.put('/driver/start-trip');
+          setTripActive(true);
+          setTripStartTime(new Date());
+
+          socketService.emit('driver:start-trip', {
+            busId: assignedBus._id,
+            timestamp: new Date()
+          });
+
+          // Start continuous location tracking
+          const watcherId = navigator.geolocation.watchPosition(
+            (position) => {
+              const location = {
+                coordinates: [position.coords.longitude, position.coords.latitude]
+              };
+              
+              setCurrentLocation(location);
+              updateLocation(location);
+            },
+            (error) => {
+              console.error('Geolocation watch error:', error);
+              // Don't show error toast on every update failure, just log it
+              if (error.code === error.PERMISSION_DENIED) {
+                toast.error('Location permission denied. Please enable GPS.');
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              maximumAge: 5000,
+              timeout: 15000
+            }
+          );
+
+          setLocationWatcher(watcherId);
         },
         (error) => {
-          console.error('Geolocation error:', error);
-          toast.error('Could not get location');
+          // Handle initial position error
+          console.error('Initial geolocation error:', error);
+          let errorMessage = 'Could not get location. ';
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Please allow location access in browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'GPS signal not available. Try moving outdoors.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'GPS timeout. Please try again.';
+              break;
+            default:
+              errorMessage += 'Unknown error occurred.';
+          }
+          
+          toast.error(errorMessage, { duration: 5000 });
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 5000,
-          timeout: 10000
+          timeout: 10000,
+          maximumAge: 0
         }
       );
-
-      setLocationWatcher(watcherId);
     } catch (error) {
       toast.error('Failed to start trip');
     }
@@ -160,26 +212,37 @@ const Dashboard = () => {
   };
 
   const updateLocation = async (location) => {
-    if (!tripActive || !assignedBus || !assignedRoute) return;
+    if (!assignedBus || !assignedRoute) return;
 
     const currentStop = assignedRoute.stops[currentStopIndex]?.name || '';
     const nextStop = assignedRoute.stops[currentStopIndex + 1]?.name || 'End';
 
     try {
-      await api.put('/driver/update-location', {
+      // Update backend database
+      const response = await api.put('/driver/update-location', {
         coordinates: location.coordinates,
         currentStop,
         nextStop
       });
 
+      // Emit real-time update to all connected clients (users and admin)
       socketService.emit('driver:location-update', {
         driverId: JSON.parse(localStorage.getItem('user'))?._id,
         busId: assignedBus._id,
-        location,
+        busNumber: assignedBus.busNumber,
+        routeId: assignedRoute._id,
+        routeNumber: assignedRoute.routeNumber,
+        location: {
+          type: 'Point',
+          coordinates: location.coordinates
+        },
         currentStop,
         nextStop,
-        status: 'active'
+        status: tripActive ? 'active' : 'idle',
+        timestamp: new Date().toISOString()
       });
+
+      console.log('📍 Location updated:', location.coordinates);
     } catch (error) {
       console.error('Error updating location:', error);
     }
@@ -244,20 +307,107 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Assignment Information Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Assigned Bus Info */}
+        <div className="rounded-2xl p-6 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 border border-blue-200 dark:border-blue-800 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">🚌</span>
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">Assigned Bus</h3>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">Bus Number</p>
+              <p className="text-2xl font-bold text-blue-900 dark:text-white">{assignedBus.busNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">Registration</p>
+              <p className="text-lg font-semibold text-blue-800 dark:text-blue-200">{assignedBus.registrationNumber}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-blue-200 dark:border-blue-700">
+              <div>
+                <p className="text-xs text-blue-700 dark:text-blue-300">Type</p>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">{assignedBus.type || 'AC'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-blue-700 dark:text-blue-300">Capacity</p>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">{assignedBus.capacity || 40} seats</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Assigned Route Info */}
+        <div className="rounded-2xl p-6 bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/30 dark:to-purple-900/30 border border-pink-200 dark:border-pink-800 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">🗺️</span>
+            <h3 className="text-sm font-semibold text-pink-900 dark:text-pink-200">Assigned Route</h3>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-pink-700 dark:text-pink-300 mb-1">Route Number</p>
+              <p className="text-2xl font-bold text-pink-900 dark:text-white">{assignedRoute.routeNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs text-pink-700 dark:text-pink-300 mb-1">Route Name</p>
+              <p className="text-lg font-semibold text-pink-800 dark:text-pink-200">{assignedRoute.routeName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-pink-200 dark:border-pink-700">
+              <div>
+                <p className="text-xs text-pink-700 dark:text-pink-300">Total Stops</p>
+                <p className="text-sm font-medium text-pink-800 dark:text-pink-200">{assignedRoute.stops?.length || 0}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-pink-700 dark:text-pink-300">Distance</p>
+                <p className="text-sm font-medium text-pink-800 dark:text-pink-200">{assignedRoute.totalDistance || 'N/A'} Km</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Driver License Info */}
+        <div className="rounded-2xl p-6 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 border border-orange-200 dark:border-orange-800 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">👤</span>
+            <h3 className="text-sm font-semibold text-orange-900 dark:text-orange-200">Driver Info</h3>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-orange-700 dark:text-orange-300 mb-1">License Number</p>
+              <p className="text-2xl font-bold text-orange-900 dark:text-white">
+                {JSON.parse(localStorage.getItem('user'))?.licenseNumber || '110'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-orange-700 dark:text-orange-300 mb-1">Status</p>
+              <span className="inline-block px-3 py-1 bg-green-500 text-white text-sm font-medium rounded-lg shadow-sm">
+                Active Driver
+              </span>
+            </div>
+            <div className="pt-2 border-t border-orange-200 dark:border-orange-700">
+              <p className="text-xs text-orange-700 dark:text-orange-300 mb-1">Connection</p>
+              <span className={`inline-block px-3 py-1 ${isOnline ? 'bg-green-500' : 'bg-red-500'} text-white text-sm font-medium rounded-lg shadow-sm`}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Header with Status */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Driver Dashboard</h1>
-          <p className="text-gray-600 mt-1">Bus {assignedBus.busNumber} - Route {assignedRoute.routeNumber}</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Driver Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Bus {assignedBus.busNumber} - Route {assignedRoute.routeNumber}</p>
         </div>
         <div className="flex items-center gap-2">
           {isOnline ? (
-            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            <span className="flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded-full text-sm font-medium">
               <Wifi size={16} />
               Connected
             </span>
           ) : (
-            <span className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+            <span className="flex items-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 rounded-full text-sm font-medium">
               <WifiOff size={16} />
               Disconnected
             </span>
@@ -267,11 +417,11 @@ const Dashboard = () => {
 
       {/* Controls */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card text-center">
+        <div className="card dark:bg-dark-800 dark:border-dark-700 text-center p-4">
           {!tripActive ? (
             <button
               onClick={startTrip}
-              className="btn btn-success w-full flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
             >
               <Play size={20} />
               Start Trip
@@ -279,7 +429,7 @@ const Dashboard = () => {
           ) : (
             <button
               onClick={stopTrip}
-              className="btn btn-danger w-full flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
             >
               <Square size={20} />
               Stop Trip
@@ -287,54 +437,54 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="card text-center">
+        <div className="card dark:bg-dark-800 dark:border-dark-700 text-center p-4">
           <button
             onClick={sendSOS}
             disabled={!tripActive}
-            className="btn btn-danger w-full flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
           >
             <AlertCircle size={20} />
             SOS Alert
           </button>
         </div>
 
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Trip Duration</p>
-          <p className="text-2xl font-bold mt-1">{getTripDuration()}</p>
+        <div className="card dark:bg-dark-800 dark:border-dark-700 text-center p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Trip Duration</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{getTripDuration()}</p>
         </div>
 
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Status</p>
-          <p className="text-xl font-bold mt-1">
+        <div className="card dark:bg-dark-800 dark:border-dark-700 text-center p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Status</p>
+          <p className="text-xl font-bold">
             {tripActive ? (
-              <span className="text-green-600">Active</span>
+              <span className="text-green-600 dark:text-green-400">Active</span>
             ) : (
-              <span className="text-gray-600">Inactive</span>
+              <span className="text-gray-600 dark:text-gray-400">Inactive</span>
             )}
           </p>
         </div>
       </div>
 
       {/* Route Progress */}
-      <div className="card">
-        <h3 className="text-lg font-semibold mb-4">Route Progress</h3>
+      <div className="card dark:bg-dark-800 dark:border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 dark:text-white">Route Progress</h3>
         <div className="flex items-center justify-between mb-4">
           <div className="flex-1">
-            <p className="text-sm text-gray-600">Current Stop</p>
-            <p className="font-bold text-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Current Stop</p>
+            <p className="font-bold text-lg dark:text-white">
               {assignedRoute.stops[currentStopIndex]?.name || 'Not Started'}
             </p>
           </div>
           <button
             onClick={nextStop}
             disabled={!tripActive || currentStopIndex >= assignedRoute.stops.length - 1}
-            className="btn btn-primary"
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all duration-200"
           >
             Next Stop
           </button>
           <div className="flex-1 text-right">
-            <p className="text-sm text-gray-600">Next Stop</p>
-            <p className="font-bold text-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Next Stop</p>
+            <p className="font-bold text-lg dark:text-white">
               {assignedRoute.stops[currentStopIndex + 1]?.name || 'End'}
             </p>
           </div>
@@ -344,17 +494,17 @@ const Dashboard = () => {
         <div className="relative pt-1">
           <div className="flex mb-2 items-center justify-between">
             <div>
-              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary-600 bg-primary-200">
+              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary-600 dark:text-primary-400 bg-primary-200 dark:bg-primary-900/30">
                 {currentStopIndex + 1} / {assignedRoute.stops.length} stops
               </span>
             </div>
             <div className="text-right">
-              <span className="text-xs font-semibold inline-block text-primary-600">
+              <span className="text-xs font-semibold inline-block text-primary-600 dark:text-primary-400">
                 {Math.round(((currentStopIndex + 1) / assignedRoute.stops.length) * 100)}%
               </span>
             </div>
           </div>
-          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary-200">
+          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary-200 dark:bg-primary-900/30">
             <div
               style={{ width: `${((currentStopIndex + 1) / assignedRoute.stops.length) * 100}%` }}
               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary-600 transition-all duration-500"
@@ -369,10 +519,10 @@ const Dashboard = () => {
               key={index}
               className={`p-3 rounded-lg flex items-center justify-between ${
                 index === currentStopIndex
-                  ? 'bg-primary-100 border-primary-500 border-2'
+                  ? 'bg-primary-100 dark:bg-primary-900/30 border-primary-500 border-2'
                   : index < currentStopIndex
-                  ? 'bg-green-50'
-                  : 'bg-gray-50'
+                  ? 'bg-green-50 dark:bg-green-900/20'
+                  : 'bg-gray-50 dark:bg-dark-700'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -381,20 +531,20 @@ const Dashboard = () => {
                     ? 'bg-primary-600 text-white'
                     : index < currentStopIndex
                     ? 'bg-green-600 text-white'
-                    : 'bg-gray-300 text-gray-600'
+                    : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
                 }`}>
                   {index + 1}
                 </span>
                 <div>
-                  <p className="font-medium">{stop.name}</p>
-                  <p className="text-xs text-gray-600">{stop.estimatedTime} min from start</p>
+                  <p className="font-medium dark:text-white">{stop.name}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">{stop.estimatedTime} min from start</p>
                 </div>
               </div>
               {index < currentStopIndex && (
-                <span className="text-green-600 text-sm font-medium">✓ Completed</span>
+                <span className="text-green-600 dark:text-green-400 text-sm font-medium">✓ Completed</span>
               )}
               {index === currentStopIndex && (
-                <span className="text-primary-600 text-sm font-medium">● Current</span>
+                <span className="text-primary-600 dark:text-primary-400 text-sm font-medium">● Current</span>
               )}
             </div>
           ))}
@@ -403,7 +553,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
-        <div className="lg:col-span-2 card p-0 overflow-hidden" style={{ height: '400px' }}>
+        <div className="lg:col-span-2 card dark:bg-dark-800 dark:border-dark-700 p-0 overflow-hidden" style={{ height: '400px' }}>
           <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -458,17 +608,17 @@ const Dashboard = () => {
         </div>
 
         {/* Notifications */}
-        <div className="card">
-          <h3 className="text-lg font-semibold mb-4">Messages</h3>
+        <div className="card dark:bg-dark-800 dark:border-dark-700">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Messages</h3>
           <div className="space-y-3">
             {notifications.map((notification) => (
-              <div key={notification._id} className="p-3 bg-gray-50 rounded-lg">
+              <div key={notification._id} className="p-3 bg-gray-50 dark:bg-dark-700 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <Bell size={16} className="text-primary-600 mt-1" />
+                  <Bell size={16} className="text-primary-600 dark:text-primary-400 mt-1" />
                   <div className="flex-1">
-                    <h4 className="font-medium text-sm mb-1">{notification.title}</h4>
-                    <p className="text-xs text-gray-600">{notification.message}</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <h4 className="font-medium text-sm mb-1 dark:text-white">{notification.title}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{notification.message}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                       {new Date(notification.createdAt).toLocaleString()}
                     </p>
                   </div>
@@ -476,7 +626,7 @@ const Dashboard = () => {
               </div>
             ))}
             {notifications.length === 0 && (
-              <p className="text-center text-gray-500 py-4 text-sm">No messages</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">No messages</p>
             )}
           </div>
         </div>

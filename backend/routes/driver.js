@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Bus = require('../models/Bus');
 const Route = require('../models/Route');
+const User = require('../models/User');
 const SOSAlert = require('../models/SOSAlert');
 const Notification = require('../models/Notification');
 const { protect, authorize } = require('../middleware/auth');
@@ -14,12 +15,26 @@ router.use(authorize('driver'));
 // @desc    Get driver's assigned bus
 router.get('/assigned-bus', async (req, res) => {
   try {
-    const bus = await Bus.findOne({ assignedDriver: req.user._id })
-      .populate('assignedRoute');
+    // Get driver's assigned bus from User model
+    const driver = await User.findById(req.user._id)
+      .populate({
+        path: 'assignedBus',
+        populate: {
+          path: 'assignedRoute',
+          model: 'Route'
+        }
+      });
+
+    if (!driver || !driver.assignedBus) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
 
     res.json({
       success: true,
-      data: bus
+      data: driver.assignedBus
     });
   } catch (error) {
     res.status(500).json({
@@ -33,11 +48,18 @@ router.get('/assigned-bus', async (req, res) => {
 // @desc    Get driver's assigned route
 router.get('/assigned-route', async (req, res) => {
   try {
-    const route = await Route.findById(req.user.assignedRoute);
+    const driver = await User.findById(req.user._id).populate('assignedRoute');
+
+    if (!driver || !driver.assignedRoute) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
 
     res.json({
       success: true,
-      data: route
+      data: driver.assignedRoute
     });
   } catch (error) {
     res.status(500).json({
