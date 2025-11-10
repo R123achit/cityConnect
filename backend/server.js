@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: process.env.CLIENT_URL || '*', // Allow Vercel frontend
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   }
@@ -17,7 +17,7 @@ const io = socketIO(server, {
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || '*', // Allow Vercel frontend
   credentials: true
 }));
 app.use(express.json());
@@ -105,6 +105,22 @@ io.on('connection', (socket) => {
     io.emit(`driver:message:${data.driverId}`, data.message);
   });
 
+  // Admin sends alert to all drivers
+  socket.on('admin:alert-drivers', (data) => {
+    console.log('⚠️ Admin alert to all drivers:', data.message);
+    io.emit('admin:alert', data);
+  });
+
+  // Admin sends notification to specific user/driver
+  socket.on('admin:send-notification', (data) => {
+    console.log('📬 Admin notification:', data);
+    if (data.recipientId) {
+      io.emit(`notification:${data.recipientId}`, data);
+    } else {
+      io.emit('notification:broadcast', data);
+    }
+  });
+
   // Get all active buses (for admin/user when they connect)
   socket.on('get:active-buses', () => {
     const buses = Array.from(activeBuses.values());
@@ -137,6 +153,7 @@ app.use('/api/buses', require('./routes/buses'));
 app.use('/api/routes', require('./routes/routes'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/tickets', require('./routes/tickets'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -149,13 +166,10 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Only start server if not in Vercel serverless environment
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-  });
-}
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+});
 
-// Export for Vercel serverless
 module.exports = app;

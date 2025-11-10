@@ -1,0 +1,39 @@
+name: Ping Backend to Prevent Sleep
+
+on:
+  schedule:
+    # every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend URL
+        env:
+          URL: ${{ secrets.PING_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "ERROR: PING_URL secret is not set";
+            exit 1;
+          fi
+          echo "Pinging $URL";
+          # Try up to 2 attempts to avoid transient network failures
+          for i in 1 2; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+            echo "Attempt $i - HTTP status: $status";
+            if [ "$status" != "" ] && [ "$status" -ge 200 ] && [ "$status" -lt 600 ]; then
+              break;
+            fi
+            sleep 2;
+          done
+          # Print a small success/fail message for logs
+          if [ "$status" = "" ]; then
+            echo "Ping failed (no response)";
+            exit 1;
+          elif [ "$status" -ge 200 ] && [ "$status" -lt 400 ]; then
+            echo "Ping successful (status $status)";
+          else
+            echo "Ping returned status $status";
+          fi

@@ -72,16 +72,16 @@ const AlertsNotifications = () => {
     e.preventDefault();
 
     try {
-      const response = await api.post('/notifications', formData);
-      toast.success('Notification sent successfully');
-      
-      // Emit via socket
-      socketService.emit('admin:send-notification', response.data.data);
+      // Use the send-realtime endpoint which handles both DB and Socket.IO
+      const response = await api.post('/notifications/send-realtime', formData);
+      toast.success('Notification sent successfully!');
       
       fetchNotifications();
       handleCloseModal();
     } catch (error) {
-      toast.error('Failed to send notification');
+      console.error('Notification error:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to send notification';
+      toast.error(errorMsg);
     }
   };
 

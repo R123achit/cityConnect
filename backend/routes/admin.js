@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const Bus = require('../models/Bus');
 const User = require('../models/User');
 const Route = require('../models/Route');
@@ -159,14 +160,27 @@ router.get('/drivers', async (req, res) => {
 // @desc    Create a new driver
 router.post('/drivers', async (req, res) => {
   try {
+    // Handle empty string values - convert to null
+    if (req.body.assignedBus === '' || req.body.assignedBus === 'null' || req.body.assignedBus === undefined) {
+      req.body.assignedBus = null;
+    }
+    if (req.body.assignedRoute === '' || req.body.assignedRoute === 'null' || req.body.assignedRoute === undefined) {
+      req.body.assignedRoute = null;
+    }
+
+    // Hash password before creating driver
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
+
     const driverData = {
       ...req.body,
+      password: hashedPassword,
       role: 'driver'
     };
 
     const driver = await User.create(driverData);
 
-    // If bus is assigned, update the bus with this driver
+    // If bus is assigned, update the bus with this driver (only if not null)
     if (req.body.assignedBus) {
       await Bus.findByIdAndUpdate(req.body.assignedBus, {
         assignedDriver: driver._id,
@@ -196,6 +210,21 @@ router.put('/drivers/:id', async (req, res) => {
   try {
     const oldDriver = await User.findById(req.params.id);
     
+    if (!oldDriver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found'
+      });
+    }
+
+    // Handle empty string values - convert to null
+    if (req.body.assignedBus === '' || req.body.assignedBus === 'null') {
+      req.body.assignedBus = null;
+    }
+    if (req.body.assignedRoute === '' || req.body.assignedRoute === 'null') {
+      req.body.assignedRoute = null;
+    }
+    
     // If bus assignment is changing, update both old and new buses
     if (req.body.assignedBus !== undefined) {
       // Remove driver from old bus if exists
@@ -205,7 +234,7 @@ router.put('/drivers/:id', async (req, res) => {
         });
       }
       
-      // Assign driver to new bus
+      // Assign driver to new bus (only if not null)
       if (req.body.assignedBus) {
         await Bus.findByIdAndUpdate(req.body.assignedBus, {
           assignedDriver: req.params.id,

@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useAuthStore from './store/authStore';
 
 // Auth Pages
@@ -22,30 +22,66 @@ import AdminProfile from './pages/Admin/Profile';
 import UserDashboard from './pages/User/Dashboard';
 import UserProfile from './pages/User/Profile';
 import TripHistory from './pages/User/TripHistory';
+import Tickets from './pages/User/Tickets';
 
 // Driver Pages
 import DriverDashboard from './pages/Driver/Dashboard';
 import DriverProfile from './pages/Driver/Profile';
+import ValidateTicket from './pages/Driver/ValidateTicket';
 
 // Layout
 import Layout from './components/Layout';
 
 function App() {
   const { isAuthenticated, user, initializeAuth } = useAuthStore();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    // Initialize auth immediately on mount
     initializeAuth();
-  }, [initializeAuth]);
+    // Set initialized after a brief moment to ensure state is updated
+    const timer = setTimeout(() => {
+      setIsInitialized(true);
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const ProtectedRoute = ({ children, allowedRoles }) => {
+    // Debug logging
+    console.log('🔒 ProtectedRoute check:', {
+      isInitialized,
+      isAuthenticated,
+      userRole: user?.role,
+      allowedRoles,
+      hasToken: !!localStorage.getItem('token'),
+      hasUser: !!localStorage.getItem('user')
+    });
+
+    // Wait for auth initialization before redirecting
+    if (!isInitialized) {
+      console.log('⏳ Waiting for initialization...');
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
     if (!isAuthenticated) {
+      console.log('❌ Not authenticated, redirecting to login');
       return <Navigate to="/login" replace />;
     }
 
     if (allowedRoles && !allowedRoles.includes(user?.role)) {
+      console.log('❌ Wrong role:', user?.role, 'Required:', allowedRoles);
       return <Navigate to="/unauthorized" replace />;
     }
 
+    console.log('✅ Access granted:', user?.role);
     return children;
   };
 
@@ -104,6 +140,7 @@ function App() {
           <Route index element={<UserDashboard />} />
           <Route path="profile" element={<UserProfile />} />
           <Route path="history" element={<TripHistory />} />
+          <Route path="tickets" element={<Tickets />} />
         </Route>
 
         {/* Driver Routes */}
@@ -114,6 +151,7 @@ function App() {
         }>
           <Route index element={<DriverDashboard />} />
           <Route path="profile" element={<DriverProfile />} />
+          <Route path="validate-ticket" element={<ValidateTicket />} />
         </Route>
 
         {/* Default Route */}

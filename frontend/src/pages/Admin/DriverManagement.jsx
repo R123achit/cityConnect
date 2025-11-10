@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, X, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Search, MessageSquare } from 'lucide-react';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import socketService from '../../utils/socket';
 
 const DriverManagement = () => {
   const [drivers, setDrivers] = useState([]);
@@ -11,14 +12,17 @@ const DriverManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [messageData, setMessageData] = useState({ title: '', message: '', priority: 'medium' });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
     licenseNumber: '',
-    assignedBus: '',
-    assignedRoute: ''
+    assignedBus: null,
+    assignedRoute: null
   });
 
   useEffect(() => {
@@ -27,17 +31,23 @@ const DriverManagement = () => {
 
   const fetchData = async () => {
     try {
+      console.log('Fetching drivers, buses, and routes...');
       const [driversRes, busesRes, routesRes] = await Promise.all([
         api.get('/admin/drivers'),
         api.get('/admin/buses'),
         api.get('/admin/routes')
       ]);
       
-      setDrivers(driversRes.data.data);
-      setBuses(busesRes.data.data);
-      setRoutes(routesRes.data.data);
+      console.log('Drivers response:', driversRes.data);
+      console.log('Total drivers fetched:', driversRes.data.data?.length);
+      
+      setDrivers(driversRes.data.data || []);
+      setBuses(busesRes.data.data || []);
+      setRoutes(routesRes.data.data || []);
     } catch (error) {
-      toast.error('Failed to fetch data');
+      console.error('Error fetching data:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -58,10 +68,28 @@ const DriverManagement = () => {
         const updateData = { ...formData };
         if (!updateData.password) delete updateData.password;
         
+        // Convert empty strings to null for ObjectId fields
+        if (updateData.assignedBus === '' || updateData.assignedBus === 'null') {
+          updateData.assignedBus = null;
+        }
+        if (updateData.assignedRoute === '' || updateData.assignedRoute === 'null') {
+          updateData.assignedRoute = null;
+        }
+        
         await api.put(`/admin/drivers/${editingDriver._id}`, updateData);
         toast.success('Driver updated successfully');
       } else {
-        await api.post('/admin/drivers', formData);
+        const createData = { ...formData };
+        
+        // Convert empty strings to null for ObjectId fields
+        if (createData.assignedBus === '' || createData.assignedBus === 'null') {
+          createData.assignedBus = null;
+        }
+        if (createData.assignedRoute === '' || createData.assignedRoute === 'null') {
+          createData.assignedRoute = null;
+        }
+        
+        await api.post('/admin/drivers', createData);
         toast.success('Driver created successfully');
       }
       
@@ -80,8 +108,8 @@ const DriverManagement = () => {
       password: '',
       phone: driver.phone || '',
       licenseNumber: driver.licenseNumber || '',
-      assignedBus: driver.assignedBus?._id || '',
-      assignedRoute: driver.assignedRoute?._id || ''
+      assignedBus: driver.assignedBus?._id || null,
+      assignedRoute: driver.assignedRoute?._id || null
     });
     setShowModal(true);
   };
@@ -107,15 +135,45 @@ const DriverManagement = () => {
       password: '',
       phone: '',
       licenseNumber: '',
-      assignedBus: '',
-      assignedRoute: ''
+      assignedBus: null,
+      assignedRoute: null
     });
+  };
+
+  const handleSendMessage = (driver) => {
+    setSelectedDriver(driver);
+    setShowMessageModal(true);
+  };
+
+  const handleMessageSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/notifications/send-realtime', {
+        title: messageData.title,
+        message: messageData.message,
+        recipients: 'specific',
+        specificRecipients: [selectedDriver._id],
+        type: 'info',
+        priority: messageData.priority
+      });
+      
+      toast.success(`Message sent to ${selectedDriver.name}`);
+      setShowMessageModal(false);
+      setMessageData({ title: '', message: '', priority: 'medium' });
+      setSelectedDriver(null);
+    } catch (error) {
+      toast.error('Failed to send message');
+    }
   };
 
   const filteredDrivers = drivers.filter(driver =>
     driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     driver.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  console.log('Current drivers state:', drivers);
+  console.log('Filtered drivers:', filteredDrivers);
+  console.log('Loading:', loading);
 
   if (loading) {
     return (
@@ -173,47 +231,137 @@ const DriverManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredDrivers.map((driver) => (
-                <tr key={driver._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium">{driver.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.phone || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.licenseNumber || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {driver.assignedBus?.busNumber || 'Not Assigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {driver.assignedRoute?.routeNumber || 'Not Assigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      driver.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {driver.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(driver)}
-                        className="text-primary-600 hover:text-primary-800"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(driver._id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+              {filteredDrivers.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-12 text-center">
+                    <div className="text-gray-500">
+                      <p className="text-lg font-medium">No drivers found</p>
+                      <p className="text-sm mt-1">
+                        {searchTerm ? 'Try a different search term' : 'Click "Add Driver" to create your first driver'}
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredDrivers.map((driver) => (
+                  <tr key={driver._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap font-medium">{driver.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.phone || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{driver.licenseNumber || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {driver.assignedBus?.busNumber || 'Not Assigned'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {driver.assignedRoute?.routeNumber || 'Not Assigned'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        driver.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {driver.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSendMessage(driver)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Send private message"
+                        >
+                          <MessageSquare size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(driver)}
+                          className="text-primary-600 hover:text-primary-800"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(driver._id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Message Modal */}
+      {showMessageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Send Message to {selectedDriver?.name}</h2>
+                <button onClick={() => setShowMessageModal(false)} className="text-gray-500 hover:text-gray-700">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={handleMessageSubmit} className="space-y-4">
+                <div>
+                  <label className="label">Title *</label>
+                  <input
+                    type="text"
+                    value={messageData.title}
+                    onChange={(e) => setMessageData({...messageData, title: e.target.value})}
+                    className="input"
+                    placeholder="Message title"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Message *</label>
+                  <textarea
+                    value={messageData.message}
+                    onChange={(e) => setMessageData({...messageData, message: e.target.value})}
+                    className="input"
+                    rows="4"
+                    placeholder="Type your message here..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Priority</label>
+                  <select
+                    value={messageData.priority}
+                    onChange={(e) => setMessageData({...messageData, priority: e.target.value})}
+                    className="input"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button type="submit" className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+                    <MessageSquare size={20} />
+                    Send Message
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMessageModal(false)}
+                    className="btn btn-secondary flex-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -299,7 +447,7 @@ const DriverManagement = () => {
                     <label className="label">Assigned Bus</label>
                     <select
                       name="assignedBus"
-                      value={formData.assignedBus}
+                      value={formData.assignedBus || ''}
                       onChange={handleInputChange}
                       className="input"
                     >
@@ -316,7 +464,7 @@ const DriverManagement = () => {
                     <label className="label">Assigned Route</label>
                     <select
                       name="assignedRoute"
-                      value={formData.assignedRoute}
+                      value={formData.assignedRoute || ''}
                       onChange={handleInputChange}
                       className="input"
                     >

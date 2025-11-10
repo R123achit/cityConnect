@@ -265,4 +265,44 @@ router.put('/notifications/:id/read', async (req, res) => {
   }
 });
 
+// @route   DELETE /api/driver/notifications/:id
+// @desc    Delete notification (driver can delete their own notifications)
+router.delete('/notifications/:id', async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    // Check if notification is for this driver
+    const isForDriver = 
+      notification.recipients === 'all' ||
+      notification.recipients === 'drivers' ||
+      notification.specificRecipients.some(id => id.toString() === req.user._id.toString());
+
+    if (!isForDriver) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this notification'
+      });
+    }
+
+    await notification.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'Notification deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

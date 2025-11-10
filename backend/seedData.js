@@ -265,13 +265,17 @@ const busStatus = ['active', 'maintenance', 'inactive'];
 
 async function seedDatabase() {
   try {
-    // Clear existing data
-    console.log('🗑️  Clearing existing data...');
-    await User.deleteMany({});
-    await Bus.deleteMany({});
-    await Route.deleteMany({});
-    await Notification.deleteMany({});
-    await SOSAlert.deleteMany({});
+    // WARNING: Commenting out deleteMany to preserve existing user accounts
+    // Only uncomment if you want to completely reset the database
+    console.log('⚠️  NOT clearing existing data (to preserve accounts)...');
+    console.log('💡 If you want to reset database, uncomment the deleteMany lines in seedData.js');
+    
+    // UNCOMMENT THESE LINES ONLY IF YOU WANT TO DELETE ALL DATA:
+    // await User.deleteMany({});
+    // await Bus.deleteMany({});
+    // await Route.deleteMany({});
+    // await Notification.deleteMany({});
+    // await SOSAlert.deleteMany({});
 
     // Create Routes
     console.log('📍 Creating routes...');

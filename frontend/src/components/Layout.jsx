@@ -14,7 +14,9 @@ import {
   X,
   History,
   Moon,
-  Sun
+  Sun,
+  Ticket,
+  QrCode
 } from 'lucide-react';
 import { useState } from 'react';
 import useAuthStore from '../store/authStore';
@@ -46,12 +48,14 @@ const Layout = () => {
 
   const userMenuItems = [
     { name: 'Live Tracking', path: '/user', icon: MapPin },
+    { name: 'My Tickets', path: '/user/tickets', icon: Ticket },
     { name: 'Trip History', path: '/user/history', icon: History },
     { name: 'Profile', path: '/user/profile', icon: User },
   ];
 
   const driverMenuItems = [
     { name: 'Dashboard', path: '/driver', icon: LayoutDashboard },
+    { name: 'Validate Ticket', path: '/driver/validate-ticket', icon: QrCode },
     { name: 'Profile', path: '/driver/profile', icon: User },
   ];
 

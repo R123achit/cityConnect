@@ -3,12 +3,38 @@ import { persist } from 'zustand/middleware';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
+// Read from localStorage immediately
+const getInitialState = () => {
+  try {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    if (token && user) {
+      const parsedUser = JSON.parse(user);
+      console.log('🔄 Initial state from localStorage:', parsedUser.email, parsedUser.role);
+      return {
+        user: parsedUser,
+        token: token,
+        isAuthenticated: true
+      };
+    }
+  } catch (error) {
+    console.error('Error reading initial state:', error);
+  }
+  
+  return {
+    user: null,
+    token: null,
+    isAuthenticated: false
+  };
+};
+
+const initialState = getInitialState();
+
 const useAuthStore = create(
   persist(
     (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
+      ...initialState,
       
       login: async (email, password) => {
         try {
@@ -91,11 +117,42 @@ const useAuthStore = create(
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
         
+        console.log('🔐 initializeAuth called');
+        console.log('  - Token exists:', !!token);
+        console.log('  - User exists:', !!user);
+        console.log('  - Token value:', token?.substring(0, 20) + '...');
+        console.log('  - User value:', user);
+        
         if (token && user) {
+          try {
+            const parsedUser = JSON.parse(user);
+            console.log('✅ Parsed user:', parsedUser);
+            console.log('  - Email:', parsedUser.email);
+            console.log('  - Role:', parsedUser.role);
+            
+            set({
+              token,
+              user: parsedUser,
+              isAuthenticated: true,
+            });
+            
+            console.log('✅ State updated - isAuthenticated: true');
+          } catch (error) {
+            console.error('❌ Invalid user data in localStorage:', error);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+            });
+          }
+        } else {
+          console.log('⚠️ No auth data found in localStorage');
           set({
-            token,
-            user: JSON.parse(user),
-            isAuthenticated: true,
+            user: null,
+            token: null,
+            isAuthenticated: false,
           });
         }
       },

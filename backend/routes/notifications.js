@@ -29,7 +29,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
 });
 
 // @route   GET /api/notifications
-// @desc    Get user notifications
+// @desc    Get user notifications (All authenticated users)
 router.get('/', protect, async (req, res) => {
   try {
     let query = {};
@@ -129,6 +129,58 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
     res.json({
       success: true,
       message: 'Notification deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   POST /api/notifications/send-realtime
+// @desc    Send real-time notification via Socket.IO (Admin only)
+router.post('/send-realtime', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { title, message, recipients, specificRecipients, type, priority } = req.body;
+
+    // Create notification in database
+    const notification = await Notification.create({
+      title,
+      message,
+      recipients,
+      specificRecipients,
+      type: type || 'info',
+      priority: priority || 'medium',
+      sender: req.user._id
+    });
+
+    // Get Socket.IO instance
+    const io = req.app.get('io');
+
+    // Emit real-time notification
+    if (specificRecipients && specificRecipients.length > 0) {
+      // Send to specific users
+      specificRecipients.forEach(recipientId => {
+        io.emit(`notification:${recipientId}`, {
+          ...notification.toObject(),
+          message,
+          type
+        });
+      });
+    } else {
+      // Broadcast to all matching recipients
+      io.emit('notification:broadcast', {
+        ...notification.toObject(),
+        message,
+        type
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Notification sent successfully',
+      data: notification
     });
   } catch (error) {
     res.status(500).json({

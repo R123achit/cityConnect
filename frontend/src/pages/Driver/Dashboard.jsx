@@ -24,6 +24,8 @@ const Dashboard = () => {
   const [tripStartTime, setTripStartTime] = useState(null);
   const [currentStopIndex, setCurrentStopIndex] = useState(0);
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [locationWatcher, setLocationWatcher] = useState(null);
 
   useEffect(() => {
@@ -57,7 +59,15 @@ const Dashboard = () => {
   const fetchNotifications = async () => {
     try {
       const response = await api.get('/driver/notifications');
-      setNotifications(response.data.data.slice(0, 5));
+      const allNotifications = response.data.data;
+      setNotifications(allNotifications);
+      
+      // Count unread notifications
+      const userId = JSON.parse(localStorage.getItem('user'))?._id;
+      const unread = allNotifications.filter(n => 
+        !n.isRead.some(r => r.user === userId)
+      ).length;
+      setUnreadCount(unread);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -92,6 +102,15 @@ const Dashboard = () => {
       fetchNotifications();
     });
 
+    // Listen for admin alerts
+    socket.on('admin:alert', (data) => {
+      toast.error(data.message, {
+        icon: '⚠️',
+        duration: 7000,
+      });
+      fetchNotifications();
+    });
+
     // Listen for admin messages
     const userId = JSON.parse(localStorage.getItem('user'))?._id;
     if (userId) {
@@ -100,6 +119,15 @@ const Dashboard = () => {
           icon: '💬',
           duration: 5000,
         });
+      });
+
+      // Listen for personal notifications
+      socket.on(`notification:${userId}`, (data) => {
+        toast(data.message, {
+          icon: data.type === 'alert' ? '⚠️' : '📢',
+          duration: 6000,
+        });
+        fetchNotifications();
       });
     }
   };
@@ -263,9 +291,37 @@ const Dashboard = () => {
       });
 
       socketService.emit('driver:sos', response.data.data);
-      toast.success('SOS alert sent to admin');
+      toast.success('🚨 SOS alert sent to admin!', { duration: 5000 });
     } catch (error) {
       toast.error('Failed to send SOS');
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      await api.put(`/driver/notifications/${notificationId}/read`);
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const isNotificationRead = (notification) => {
+    const userId = JSON.parse(localStorage.getItem('user'))?._id;
+    return notification.isRead.some(r => r.user === userId);
+  };
+
+  const deleteNotification = async (notificationId) => {
+    if (!window.confirm('Delete this notification?')) return;
+    
+    try {
+      await api.delete(`/driver/notifications/${notificationId}`);
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      toast.success('Notification deleted');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -400,7 +456,19 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Driver Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Bus {assignedBus.busNumber} - Route {assignedRoute.routeNumber}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="relative p-2 bg-white dark:bg-dark-800 rounded-lg shadow-md hover:shadow-lg transition-all"
+          >
+            <Bell size={24} className="text-gray-700 dark:text-gray-300" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
           {isOnline ? (
             <span className="flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded-full text-sm font-medium">
               <Wifi size={16} />
@@ -551,6 +619,79 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Notifications Panel */}
+      {showNotifications && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowNotifications(false)}>
+          <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-200 dark:border-dark-700 flex justify-between items-center">
+              <h3 className="text-2xl font-bold dark:text-white">Notifications & Alerts</h3>
+              <button onClick={() => setShowNotifications(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[calc(80vh-100px)] p-6 space-y-3">
+              {notifications.length === 0 ? (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">No notifications</p>
+              ) : (
+                notifications.map((notification) => {
+                  const isRead = isNotificationRead(notification);
+                  return (
+                    <div
+                      key={notification._id}
+                      className={`p-4 rounded-lg border transition-all ${
+                        isRead
+                          ? 'bg-gray-50 dark:bg-dark-700/50 border-gray-200 dark:border-dark-600'
+                          : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-1 ${
+                          notification.priority === 'high' ? 'text-red-500' :
+                          notification.priority === 'medium' ? 'text-yellow-500' :
+                          'text-blue-500'
+                        }`}>
+                          {notification.type === 'alert' ? '⚠️' :
+                           notification.type === 'warning' ? '🚨' :
+                           notification.type === 'info' ? 'ℹ️' : '📢'}
+                        </div>
+                        <div className="flex-1 cursor-pointer" onClick={() => !isRead && markAsRead(notification._id)}>
+                          <div className="flex items-start justify-between">
+                            <h4 className="font-semibold text-sm dark:text-white">{notification.title}</h4>
+                            {!isRead && (
+                              <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{notification.message}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-500">
+                            <span>From: {notification.sender?.name || 'Admin'}</span>
+                            <span>•</span>
+                            <span>{new Date(notification.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notification._id);
+                          }}
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                          title="Delete notification"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
         <div className="lg:col-span-2 card dark:bg-dark-800 dark:border-dark-700 p-0 overflow-hidden" style={{ height: '400px' }}>
@@ -607,28 +748,70 @@ const Dashboard = () => {
           </MapContainer>
         </div>
 
-        {/* Notifications */}
+        {/* Notifications Summary */}
         <div className="card dark:bg-dark-800 dark:border-dark-700">
-          <h3 className="text-lg font-semibold mb-4 dark:text-white">Messages</h3>
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <div key={notification._id} className="p-3 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Bell size={16} className="text-primary-600 dark:text-primary-400 mt-1" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm mb-1 dark:text-white">{notification.title}</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{notification.message}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {new Date(notification.createdAt).toLocaleString()}
-                    </p>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold dark:text-white">Alerts & Messages</h3>
+            {unreadCount > 0 && (
+              <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {notifications.slice(0, 5).map((notification) => {
+              const isRead = isNotificationRead(notification);
+              return (
+                <div
+                  key={notification._id}
+                  className={`p-3 rounded-lg transition-all ${
+                    isRead
+                      ? 'bg-gray-50 dark:bg-dark-700'
+                      : 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Bell size={16} className={`mt-1 ${
+                      isRead ? 'text-gray-400' : 'text-blue-600 dark:text-blue-400'
+                    }`} />
+                    <div className="flex-1 cursor-pointer" onClick={() => !isRead && markAsRead(notification._id)}>
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-medium text-sm mb-1 dark:text-white">{notification.title}</h4>
+                        {!isRead && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{notification.message}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification._id);
+                      }}
+                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
+                      title="Delete"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {notifications.length === 0 && (
               <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">No messages</p>
             )}
           </div>
+          {notifications.length > 5 && (
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="w-full mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              View All ({notifications.length})
+            </button>
+          )}
         </div>
       </div>
     </div>

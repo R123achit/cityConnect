@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
@@ -27,7 +28,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user (password will be hashed by User model pre-save hook)
     const user = await User.create({
       name,
       email,
@@ -62,6 +63,14 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
+      });
+    }
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
