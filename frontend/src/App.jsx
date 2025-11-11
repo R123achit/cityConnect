@@ -3,6 +3,9 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from 'react';
 import useAuthStore from './store/authStore';
 
+// Landing Page
+import Landing from './pages/Landing';
+
 // Auth Pages
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -154,14 +157,8 @@ function App() {
           <Route path="validate-ticket" element={<ValidateTicket />} />
         </Route>
 
-        {/* Default Route */}
-        <Route path="/" element={
-          isAuthenticated ? (
-            <Navigate to={`/${user?.role}`} replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        } />
+        {/* Landing & Default Route */}
+        <Route path="/" element={<Landing />} />
 
         {/* Unauthorized */}
         <Route path="/unauthorized" element={
