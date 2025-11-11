@@ -18,8 +18,10 @@ const Landing = () => {
         {/* Header */}
         <nav className="flex justify-between items-center mb-10 sm:mb-20">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-600 to-primary-700 dark:from-purple-600 dark:to-purple-700 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
-              <Bus className="text-white" size={24} />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-dark-800 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
+              <svg className="w-6 h-6 sm:w-7 sm:h-7 text-primary-600 dark:text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
             </div>
             <span className="text-2xl sm:text-3xl font-display font-bold bg-gradient-to-r from-primary-600 to-purple-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
               CitiConnect
