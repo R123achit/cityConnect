@@ -63,66 +63,66 @@ const Profile = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Admin Profile</h1>
-        <p className="text-gray-600 mt-1">Manage your account settings</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Profile</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account settings</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Card */}
-        <div className="card text-center">
-          <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="text-primary-600" size={48} />
+        <div className="card dark:bg-dark-800 dark:border-dark-700 text-center">
+          <div className="w-24 h-24 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <User className="text-primary-600 dark:text-primary-400" size={48} />
           </div>
-          <h3 className="font-bold text-xl mb-1">{user?.name}</h3>
-          <p className="text-gray-600 mb-2">{user?.email}</p>
-          <span className="inline-block px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm font-medium">
+          <h3 className="font-bold text-xl mb-1 dark:text-white">{user?.name}</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-2">{user?.email}</p>
+          <span className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-400 rounded-full text-sm font-medium">
             Administrator
           </span>
         </div>
 
         {/* Update Profile Form */}
-        <div className="card lg:col-span-2">
-          <h3 className="text-xl font-bold mb-6">Update Profile</h3>
+        <div className="card dark:bg-dark-800 dark:border-dark-700 lg:col-span-2">
+          <h3 className="text-xl font-bold mb-6 dark:text-white">Update Profile</h3>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div>
-              <label className="label">Full Name</label>
+              <label className="label dark:text-gray-300">Full Name</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-900 dark:border-dark-600 dark:text-white"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="label">Email</label>
+              <label className="label dark:text-gray-300">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="email"
                   value={user?.email}
-                  className="input pl-12 bg-gray-100"
+                  className="input pl-12 bg-gray-100 dark:bg-dark-700 dark:border-dark-600 dark:text-gray-400"
                   disabled
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Email cannot be changed</p>
             </div>
 
             <div>
-              <label className="label">Phone Number</label>
+              <label className="label dark:text-gray-300">Phone Number</label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
                 <input
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="input pl-12"
+                  className="input pl-12 dark:bg-dark-900 dark:border-dark-600 dark:text-white"
                 />
               </div>
             </div>
@@ -136,34 +136,34 @@ const Profile = () => {
       </div>
 
       {/* Change Password */}
-      <div className="card">
-        <h3 className="text-xl font-bold mb-6">Change Password</h3>
+      <div className="card dark:bg-dark-800 dark:border-dark-700">
+        <h3 className="text-xl font-bold mb-6 dark:text-white">Change Password</h3>
         <form onSubmit={handleChangePassword} className="max-w-2xl space-y-4">
           <div>
-            <label className="label">Current Password</label>
+            <label className="label dark:text-gray-300">Current Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
               <input
                 type="password"
                 name="currentPassword"
                 value={passwordData.currentPassword}
                 onChange={handlePasswordChange}
-                className="input pl-12"
+                className="input pl-12 dark:bg-dark-900 dark:border-dark-600 dark:text-white"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="label">New Password</label>
+            <label className="label dark:text-gray-300">New Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
               <input
                 type="password"
                 name="newPassword"
                 value={passwordData.newPassword}
                 onChange={handlePasswordChange}
-                className="input pl-12"
+                className="input pl-12 dark:bg-dark-900 dark:border-dark-600 dark:text-white"
                 required
                 minLength={6}
               />
@@ -171,15 +171,15 @@ const Profile = () => {
           </div>
 
           <div>
-            <label className="label">Confirm New Password</label>
+            <label className="label dark:text-gray-300">Confirm New Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
               <input
                 type="password"
                 name="confirmPassword"
                 value={passwordData.confirmPassword}
                 onChange={handlePasswordChange}
-                className="input pl-12"
+                className="input pl-12 dark:bg-dark-900 dark:border-dark-600 dark:text-white"
                 required
                 minLength={6}
               />

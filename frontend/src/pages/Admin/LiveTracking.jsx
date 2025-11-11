@@ -128,8 +128,8 @@ const LiveTracking = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Live Bus Tracking</h1>
-        <p className="text-gray-600 mt-1">Monitor all buses in real-time</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Live Bus Tracking</h1>
+        <p className="text-gray-600 dark:text-gray-300 mt-1">Monitor all buses in real-time</p>
       </div>
 
       {/* Controls */}

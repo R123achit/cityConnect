@@ -11,7 +11,6 @@ const Tickets = () => {
   const [calculatedFare, setCalculatedFare] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [routeSearchTerm, setRouteSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     busId: '',
     routeId: '',
@@ -78,14 +77,16 @@ const Tickets = () => {
     }
   };
 
-  const handleRouteChange = (routeId) => {
+  const handleRouteChange = async (routeId) => {
     setFormData({ ...formData, routeId, busId: '', fromStop: '', toStop: '' });
     setRouteStops([]);
     setBuses([]);
     setCalculatedFare(null);
     if (routeId) {
-      fetchRouteStops(routeId);
-      fetchBusesByRoute(routeId);
+      await Promise.all([
+        fetchRouteStops(routeId),
+        fetchBusesByRoute(routeId)
+      ]);
     }
   };
 
@@ -97,36 +98,44 @@ const Tickets = () => {
     }
   }, [formData.fromStop, formData.toStop, formData.routeId]);
 
-  const getFilteredRoutes = () => {
-    if (!routeSearchTerm) return routes;
-    const search = routeSearchTerm.toLowerCase();
-    return routes.filter(route => 
-      route.routeNumber?.toLowerCase().includes(search) ||
-      route.routeName?.toLowerCase().includes(search) ||
-      route.startPoint?.toLowerCase().includes(search) ||
-      route.endPoint?.toLowerCase().includes(search)
-    );
-  };
-
   const handleGenerateTicket = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Form submitted', { formData, calculatedFare, loading });
+    
+    if (loading) {
+      console.log('Already loading, preventing double submission');
+      return;
+    }
     
     if (!calculatedFare) {
+      console.log('No calculated fare');
       toast.error('Please select valid stops');
       return;
     }
 
+    if (!formData.busId || !formData.routeId || !formData.fromStop || !formData.toStop) {
+      console.log('Missing fields:', formData);
+      toast.error('Please fill all fields');
+      return;
+    }
+
     setLoading(true);
+    console.log('Generating ticket...');
 
     try {
       const response = await api.post('/tickets/generate', formData);
+      console.log('Ticket generated successfully:', response.data);
       toast.success('Ticket generated and sent to your email!');
       setShowGenerateModal(false);
-      fetchTicketHistory();
       setFormData({ busId: '', routeId: '', fromStop: '', toStop: '' });
       setRouteStops([]);
       setCalculatedFare(null);
+      await fetchTicketHistory();
     } catch (error) {
+      console.error('Ticket generation error:', error);
+      console.error('Error response:', error.response?.data);
       toast.error(error.response?.data?.message || 'Failed to generate ticket');
     } finally {
       setLoading(false);
@@ -258,37 +267,30 @@ const Tickets = () => {
 
       {/* Generate Ticket Modal */}
       {showGenerateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white dark:bg-dark-800 rounded-lg max-w-md w-full p-4 sm:p-6 my-4">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 dark:text-white">Generate Ticket</h2>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          <div className="min-h-screen flex items-center justify-center p-4 py-8">
+            <div className="bg-white dark:bg-dark-800 rounded-lg max-w-md w-full p-4 sm:p-6 my-auto max-h-[85vh] overflow-y-auto shadow-2xl">
+              <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 dark:text-white sticky top-0 bg-white dark:bg-dark-800 pb-2">Generate Ticket</h2>
             
-            <form onSubmit={handleGenerateTicket} className="space-y-4">
+            <form onSubmit={handleGenerateTicket} className="space-y-3 sm:space-y-4">
               <div>
-                <label className="label dark:text-gray-300 text-sm">Route * (Type to search)</label>
-                <input
-                  type="text"
-                  list="routes-list"
-                  value={routeSearchTerm}
-                  onChange={(e) => {
-                    setRouteSearchTerm(e.target.value);
-                    const selected = routes.find(r => 
-                      `${r.routeNumber} - ${r.routeName}` === e.target.value
-                    );
-                    if (selected) {
-                      handleRouteChange(selected._id);
-                    } else if (!e.target.value) {
-                      handleRouteChange('');
-                    }
-                  }}
+                <label className="label dark:text-gray-300 text-sm">Route *</label>
+                <select
+                  value={formData.routeId}
+                  onChange={(e) => handleRouteChange(e.target.value)}
                   className="input dark:bg-dark-900 dark:border-dark-600 dark:text-white text-sm"
-                  placeholder="Search route..."
                   required
-                />
-                <datalist id="routes-list">
-                  {getFilteredRoutes().map((route) => (
-                    <option key={route._id} value={`${route.routeNumber} - ${route.routeName}`} />
+                >
+                  <option value="">Select Route</option>
+                  {routes.map((route) => (
+                    <option key={route._id} value={route._id}>
+                      {route.routeNumber} - {route.routeName}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               <div>
@@ -362,23 +364,31 @@ const Tickets = () => {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sticky bottom-0 bg-white dark:bg-dark-800 pb-2">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="btn btn-primary flex-1 text-sm sm:text-base"
+                  disabled={loading || !calculatedFare}
+                  className="btn btn-primary flex-1 text-sm sm:text-base touch-manipulation"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   {loading ? 'Generating...' : 'Generate Ticket'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowGenerateModal(false)}
-                  className="btn btn-secondary flex-1 text-sm sm:text-base"
+                  onClick={() => {
+                    setShowGenerateModal(false);
+                    setFormData({ busId: '', routeId: '', fromStop: '', toStop: '' });
+                    setRouteStops([]);
+                    setCalculatedFare(null);
+                  }}
+                  className="btn btn-secondary flex-1 text-sm sm:text-base touch-manipulation"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   Cancel
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

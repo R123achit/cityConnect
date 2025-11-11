@@ -72,14 +72,14 @@ const Layout = () => {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-3 bg-gradient-to-r from-primary-600 to-primary-700 dark:from-purple-600 dark:to-purple-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95"
+        className="lg:hidden fixed top-4 left-4 z-[60] p-3 bg-gradient-to-r from-primary-600 to-primary-700 dark:from-purple-600 dark:to-purple-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95"
       >
         {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-72 bg-white dark:bg-dark-900 shadow-2xl dark:shadow-dark-glow transform transition-transform duration-300 ease-in-out border-r border-gray-200 dark:border-dark-700 ${
+        className={`fixed top-0 left-0 z-50 h-screen w-72 bg-white dark:bg-dark-900 shadow-2xl dark:shadow-dark-glow transform transition-transform duration-300 ease-in-out border-r border-gray-200 dark:border-dark-700 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -169,13 +169,13 @@ const Layout = () => {
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-30 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-40 lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Main Content */}
-      <main className="lg:ml-72 min-h-screen pt-16 lg:pt-0 transition-colors duration-300">
+      <main className="lg:ml-72 min-h-screen pt-16 lg:pt-0 transition-colors duration-300 relative z-0">
         <div className="p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>

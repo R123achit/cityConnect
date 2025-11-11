@@ -107,6 +107,23 @@
   width: 100%;
   border-radius: 1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
+}
+
+/* Prevent map from overlapping sidebar */
+.leaflet-pane,
+.leaflet-tile-pane,
+.leaflet-overlay-pane,
+.leaflet-shadow-pane,
+.leaflet-marker-pane,
+.leaflet-tooltip-pane,
+.leaflet-popup-pane {
+  z-index: auto !important;
+}
+
+.leaflet-control {
+  z-index: 10 !important;
 }
 
 /* Custom scrollbar */

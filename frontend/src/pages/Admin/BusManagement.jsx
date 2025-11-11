@@ -130,8 +130,8 @@ const BusManagement = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Bus Management</h1>
-          <p className="text-gray-600 mt-1">Manage your fleet of buses</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bus Management</h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">Manage your fleet of buses</p>
         </div>
         <button
           onClick={() => setShowModal(true)}

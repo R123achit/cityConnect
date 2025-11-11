@@ -10,7 +10,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout for operations like email sending
 });
 
 // Request interceptor to add token
@@ -34,6 +34,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    console.log('API Error:', error.message, error.code);
     if (error.response?.status === 401) {
       // Only redirect if not already on login page
       if (!window.location.pathname.includes('/login')) {
@@ -43,7 +44,7 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     } else if (error.code === 'ECONNABORTED') {
-      console.error('⏱️ Request timeout');
+      console.error('⏱️ Request timeout - operation took too long');
     } else if (error.message === 'Network Error') {
       console.error('🌐 Network error - check if backend is running');
     }

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { QrCode, CheckCircle, XCircle, Scan } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { QrCode, CheckCircle, XCircle, Scan, Camera, X } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
@@ -7,21 +8,58 @@ const ValidateTicket = () => {
   const [ticketId, setTicketId] = useState('');
   const [validationResult, setValidationResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const scannerRef = useRef(null);
 
-  const handleValidate = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+  }, []);
+
+  useEffect(() => {
+    if (showScanner) {
+      const scanner = new Html5QrcodeScanner('qr-reader', {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      });
+
+      scanner.render(onScanSuccess, onScanError);
+      scannerRef.current = scanner;
+
+      return () => {
+        scanner.clear().catch(err => console.error('Scanner cleanup error:', err));
+      };
+    }
+  }, [showScanner]);
+
+  const onScanSuccess = (decodedText) => {
+    setTicketId(decodedText);
+    stopScanner();
+    validateTicket(decodedText);
+  };
+
+  const onScanError = (error) => {
+    // Ignore scan errors (happens continuously while scanning)
+  };
+
+  const validateTicket = async (id) => {
     setLoading(true);
     setValidationResult(null);
 
     try {
-      const response = await api.post('/tickets/validate', { ticketId });
+      const response = await api.post('/driver/validate-ticket', { ticketId: id });
       setValidationResult({
         success: true,
         data: response.data.data,
-        message: response.data.message
+        message: response.data.message,
+        availableSeats: response.data.data.availableSeats,
+        occupiedSeats: response.data.data.occupiedSeats
       });
-      toast.success('Ticket validated successfully!');
-      setTicketId('');
+      toast.success(`Ticket validated! ${response.data.data.availableSeats} seats available`);
     } catch (error) {
       setValidationResult({
         success: false,
@@ -31,6 +69,23 @@ const ValidateTicket = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleValidate = async (e) => {
+    e.preventDefault();
+    validateTicket(ticketId);
+    setTicketId('');
+  };
+
+  const startScanner = () => {
+    setShowScanner(true);
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(err => console.error('Error stopping scanner:', err));
+    }
+    setShowScanner(false);
   };
 
   return (
@@ -63,15 +118,48 @@ const ValidateTicket = () => {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary w-full flex items-center justify-center gap-2"
-          >
-            <QrCode size={20} />
-            {loading ? 'Validating...' : 'Validate Ticket'}
-          </button>
+          <div className={isMobile ? "grid grid-cols-2 gap-3" : "flex"}>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={startScanner}
+                className="btn bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+              >
+                <Camera size={20} />
+                Scan QR
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`btn btn-primary flex items-center justify-center gap-2 ${!isMobile ? 'w-full' : ''}`}
+            >
+              <QrCode size={20} />
+              {loading ? 'Validating...' : 'Validate Ticket'}
+            </button>
+          </div>
         </form>
+
+        {/* QR Scanner Modal */}
+        {showScanner && (
+          <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div className="relative w-full max-w-lg">
+              <button
+                onClick={stopScanner}
+                className="absolute top-2 right-2 z-10 p-2 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg"
+              >
+                <X size={24} />
+              </button>
+              <div className="bg-white dark:bg-dark-800 rounded-lg p-6">
+                <h3 className="text-xl font-bold mb-4 text-center dark:text-white">Scan QR Code</h3>
+                <div id="qr-reader" className="w-full"></div>
+                <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+                  Position QR code within the frame to scan automatically
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Validation Result */}
         {validationResult && (
@@ -104,27 +192,25 @@ const ValidateTicket = () => {
               <div className="space-y-2 text-sm border-t border-green-200 dark:border-green-800 pt-4">
                 <div className="flex justify-between">
                   <span className="text-gray-700 dark:text-gray-300">Passenger:</span>
-                  <span className="font-semibold dark:text-white">{validationResult.data.userId?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">Bus:</span>
-                  <span className="font-semibold dark:text-white">{validationResult.data.busId?.busNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700 dark:text-gray-300">Route:</span>
-                  <span className="font-semibold dark:text-white">{validationResult.data.routeId?.routeNumber}</span>
+                  <span className="font-semibold dark:text-white">{validationResult.data.passenger}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-700 dark:text-gray-300">From:</span>
-                  <span className="font-semibold dark:text-white">{validationResult.data.fromStop}</span>
+                  <span className="font-semibold dark:text-white">{validationResult.data.ticket?.fromStop}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-700 dark:text-gray-300">To:</span>
-                  <span className="font-semibold dark:text-white">{validationResult.data.toStop}</span>
+                  <span className="font-semibold dark:text-white">{validationResult.data.ticket?.toStop}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-700 dark:text-gray-300">Fare:</span>
-                  <span className="font-bold text-green-600 dark:text-green-400">₹{validationResult.data.fare}</span>
+                  <span className="font-bold text-green-600 dark:text-green-400">₹{validationResult.data.ticket?.fare}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-green-200 dark:border-green-800">
+                  <span className="text-gray-700 dark:text-gray-300">Seats Available:</span>
+                  <span className="font-bold text-lg text-green-600 dark:text-green-400">
+                    {validationResult.availableSeats} / {validationResult.occupiedSeats + validationResult.availableSeats}
+                  </span>
                 </div>
               </div>
             )}

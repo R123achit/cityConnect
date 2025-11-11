@@ -83,8 +83,8 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome to CitiConnect Admin Panel</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Welcome to CitiConnect Admin Panel</p>
       </div>
 
       {/* Stats Grid */}
@@ -92,12 +92,12 @@ const Dashboard = () => {
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="card">
+            <div key={index} className="card dark:bg-dark-800 dark:border-dark-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">{stat.title}</p>
-                  <h3 className="text-3xl font-bold mt-2">{stat.value}</h3>
-                  <p className="text-sm text-green-600 mt-1">{stat.change} from last month</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{stat.title}</p>
+                  <h3 className="text-3xl font-bold mt-2 dark:text-white">{stat.value}</h3>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">{stat.change} from last month</p>
                 </div>
                 <div className={`${stat.color} p-4 rounded-lg`}>
                   <Icon className="text-white" size={28} />
@@ -111,8 +111,8 @@ const Dashboard = () => {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Bus Status Breakdown */}
-        <div className="card">
-          <h3 className="text-lg font-semibold mb-4">Bus Status Breakdown</h3>
+        <div className="card dark:bg-dark-800 dark:border-dark-700">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Bus Status Breakdown</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -135,8 +135,8 @@ const Dashboard = () => {
         </div>
 
         {/* Buses by Type */}
-        <div className="card">
-          <h3 className="text-lg font-semibold mb-4">Buses by Type</h3>
+        <div className="card dark:bg-dark-800 dark:border-dark-700">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Buses by Type</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={busByType}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -151,24 +151,24 @@ const Dashboard = () => {
       </div>
 
       {/* Recent SOS Alerts */}
-      <div className="card">
-        <h3 className="text-lg font-semibold mb-4">Recent SOS Alerts</h3>
+      <div className="card dark:bg-dark-800 dark:border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 dark:text-white">Recent SOS Alerts</h3>
         {recentAlerts && recentAlerts.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-600">
+              <thead className="bg-gray-50 dark:bg-dark-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bus</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Driver</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bus</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-dark-600">
                 {recentAlerts.map((alert) => (
                   <tr key={alert._id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{alert.driver?.name || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{alert.bus?.busNumber || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-300">{alert.driver?.name || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-300">{alert.bus?.busNumber || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         alert.status === 'active' ? 'bg-red-100 text-red-800' :
@@ -178,7 +178,7 @@ const Dashboard = () => {
                         {alert.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {new Date(alert.createdAt).toLocaleString()}
                     </td>
                   </tr>
@@ -187,7 +187,7 @@ const Dashboard = () => {
             </table>
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-4">No recent alerts</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center py-4">No recent alerts</p>
         )}
       </div>
     </div>

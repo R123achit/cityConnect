@@ -71,6 +71,14 @@ const busSchema = new mongoose.Schema({
   nextStop: {
     type: String,
     default: ''
+  },
+  availableSeats: {
+    type: Number,
+    default: function() { return this.capacity; }
+  },
+  occupiedSeats: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

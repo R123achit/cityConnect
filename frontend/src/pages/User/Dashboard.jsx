@@ -4,6 +4,7 @@ import { MapPin, Navigation, Clock, Bus as BusIcon, Radio } from 'lucide-react';
 import socketService from '../../utils/socket';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import SeatAvailability from '../../components/SeatAvailability';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -113,7 +114,7 @@ const Dashboard = () => {
     // Listen for real-time bus location updates
     socket.on('bus:location-updated', (data) => {
       console.log('📍 Bus location updated:', data);
-      setLiveUpdates(prev => prev + 1); // Increment counter for visual feedback
+      setLiveUpdates(prev => prev + 1);
       
       setActiveBuses(prev => {
         const index = prev.findIndex(b => b._id === data.busId);
@@ -131,6 +132,25 @@ const Dashboard = () => {
         }
         return prev;
       });
+
+    // Listen for seat updates
+    socket.on('bus:seat-update', (data) => {
+      console.log('💺 Seat availability updated:', data);
+      setActiveBuses(prev => {
+        const index = prev.findIndex(b => b._id === data.busId);
+        if (index !== -1) {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            availableSeats: data.availableSeats,
+            occupiedSeats: data.occupiedSeats,
+            capacity: data.capacity
+          };
+          return updated;
+        }
+        return prev;
+      });
+    });
 
       // Update selected bus if it's the one being updated
       if (selectedBus && selectedBus._id === data.busId) {
@@ -250,7 +270,7 @@ const Dashboard = () => {
       </div>
 
       {/* Map */}
-      <div className="card dark:bg-dark-800 dark:border-dark-700 p-0 overflow-hidden" style={{ height: '400px', minHeight: '300px' }}>
+      <div className="card dark:bg-dark-800 dark:border-dark-700 p-0 overflow-hidden relative" style={{ height: '400px', minHeight: '300px', zIndex: 1 }}>
         <MapContainer
           center={center}
           zoom={13}
@@ -387,6 +407,13 @@ const Dashboard = () => {
                       <Clock size={14} />
                       {calculateETA(bus)}
                     </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 dark:text-gray-400 mb-1">Seats</p>
+                    <SeatAvailability 
+                      availableSeats={bus.availableSeats || bus.capacity || 40} 
+                      capacity={bus.capacity || 40} 
+                    />
                   </div>
                 </div>
               </div>

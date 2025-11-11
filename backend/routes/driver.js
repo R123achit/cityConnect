@@ -5,6 +5,7 @@ const Route = require('../models/Route');
 const User = require('../models/User');
 const SOSAlert = require('../models/SOSAlert');
 const Notification = require('../models/Notification');
+const Ticket = require('../models/Ticket');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes are protected and for drivers only
@@ -302,6 +303,68 @@ router.delete('/notifications/:id', async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   POST /api/driver/validate-ticket
+// @desc    Validate QR ticket and update seat count
+router.post('/validate-ticket', async (req, res) => {
+  try {
+    const { ticketId } = req.body;
+
+    const ticket = await Ticket.findOne({ ticketId }).populate('busId userId');
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    if (ticket.status === 'used') {
+      return res.status(400).json({ success: false, message: 'Ticket already used' });
+    }
+
+    if (ticket.status === 'expired' || new Date() > ticket.validUntil) {
+      return res.status(400).json({ success: false, message: 'Ticket expired' });
+    }
+
+    const bus = await Bus.findOne({ assignedDriver: req.user._id });
+
+    if (!bus) {
+      return res.status(404).json({ success: false, message: 'No bus assigned' });
+    }
+
+    if (ticket.busId._id.toString() !== bus._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Ticket not valid for this bus' });
+    }
+
+    ticket.status = 'used';
+    ticket.usedAt = new Date();
+    await ticket.save();
+
+    bus.occupiedSeats = (bus.occupiedSeats || 0) + 1;
+    bus.availableSeats = bus.capacity - bus.occupiedSeats;
+    await bus.save();
+
+    const io = req.app.get('io');
+    io.emit('bus:seat-update', {
+      busId: bus._id,
+      busNumber: bus.busNumber,
+      availableSeats: bus.availableSeats,
+      occupiedSeats: bus.occupiedSeats,
+      capacity: bus.capacity
+    });
+
+    res.json({
+      success: true,
+      message: 'Ticket validated successfully',
+      data: {
+        ticket,
+        passenger: ticket.userId.name,
+        availableSeats: bus.availableSeats,
+        occupiedSeats: bus.occupiedSeats
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

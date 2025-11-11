@@ -177,7 +177,7 @@ router.post('/generate', protect, async (req, res) => {
       .populate('busId', 'busNumber registrationNumber')
       .populate('routeId', 'routeNumber routeName');
 
-    // Send email with ticket
+    // Send email with ticket (async, non-blocking)
     const emailData = {
       ticketId: populatedTicket.ticketId,
       busNumber: populatedTicket.busId.busNumber,
@@ -190,11 +190,15 @@ router.post('/generate', protect, async (req, res) => {
       validUntil: populatedTicket.validUntil
     };
 
-    await sendTicketEmail(populatedTicket.userId.email, populatedTicket.userId.name, emailData);
+    // Send email in background (don't wait for it)
+    sendTicketEmail(populatedTicket.userId.email, populatedTicket.userId.name, emailData)
+      .then(() => console.log(`✅ Email sent to ${populatedTicket.userId.email}`))
+      .catch(err => console.error('❌ Email sending failed:', err.message));
 
+    // Respond immediately
     res.status(201).json({
       success: true,
-      message: 'Ticket generated and sent to your email',
+      message: 'Ticket generated successfully! Check your email.',
       data: populatedTicket
     });
   } catch (error) {
